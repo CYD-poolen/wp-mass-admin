@@ -1,0 +1,46 @@
+#!/bin/bash
+
+old_user="$1"
+config_file="/usr/local/etc/wp-mass-admin/wpma.conf"
+tmp_file="/tmp/wpma.scratch"
+
+rm -f $tmp_file
+touch $tmp_file
+
+while read line
+do
+    echo $line | grep "user_names" >> /dev/null
+    if [ $? != 0 ]
+    then
+	echo $line >> $tmp_file
+    else
+	IFS=', ' read -r -a user_names <<< "$(echo $line | sed -e 's/user_names=//g' | tr -d '"')"
+    last_user=${user_names[${#user_names[@]}-1]} 
+    i=2
+    while [[ $last_user == $old_user && $last_user != ${user_names[0]} ]]
+    do
+        last_user=${user_names[${#user_names[@]}-$i]} 
+        i=$((i+1))
+    done
+
+	echo -n "user_names=\"" >> $tmp_file
+	for user in $user_names
+	do
+        if [[ $user != $old_user ]]
+        then
+            echo -n "$user" >> $tmp_file
+
+            if [[ $user != $last_user ]]
+            then
+                echo -n " " >> $tmp_file
+            fi
+        fi
+	done
+	echo "\"" >> $tmp_file
+    fi
+done < $config_file
+
+cat $tmp_file > $config_file
+rm $tmp_file
+
+

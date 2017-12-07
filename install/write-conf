@@ -1,0 +1,31 @@
+#!/bin/bash
+
+new_user="$1"
+config_file="/usr/local/etc/wp-mass-admin/wpma.conf"
+tmp_file="/tmp/wpma.scratch"
+
+rm -f $tmp_file
+touch $tmp_file
+
+while read line
+do
+    echo $line | grep "user_names" >> /dev/null
+    if [ $? != 0 ]
+    then
+	echo $line >> $tmp_file
+    else
+	user_names="$(echo $line | sed -e 's/user_names=//g' | tr -d '"')"
+	echo -n "user_names=\"" >> $tmp_file
+	for user in $user_names
+	do
+		echo -n "$user " >> $tmp_file
+	done
+	echo -n "$new_user" >> $tmp_file
+	echo "\"" >> $tmp_file
+    fi
+done < $config_file
+
+cat $tmp_file > $config_file
+rm $tmp_file
+
+

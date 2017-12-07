@@ -1,7 +1,7 @@
 # Delete WP-site
 
-To delete a previously installed WP-site - change to this directory and run:
+To delete a previously installed Wordpress site, run:
 
 <pre>
-sudo ./deleteWPInstall.bash userName FQDN
+sudo wpma delete user_name FQDN
 </pre>

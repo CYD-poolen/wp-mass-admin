@@ -1,0 +1,66 @@
+#!/bin/bash
+
+if [[ $# != 2 || $S1 == "-h" || $S1 == "--help" ]]
+then
+	echo "Usage: "
+	echo "	$0 user_name FQDN"
+	exit 1
+fi
+
+cd "$(dirname "$0")"
+# Read config file with paths to WP-installs and usernames
+source /usr/local/default/etc/wp-mass-admin/wpma.conf
+
+if [[ -e /usr/local/etc/wp-mass-admin/wpma.conf ]]; then
+    source /usr/local/etc/wp-mass-admin/wpma.conf
+else
+    echo "Please add a config file to your /usr/local/etc/wp-mass-admin folder. Instructions can be found in the README."
+    exit 2
+fi
+
+user_name="$1"
+FQDN="$2"
+letsencrypt_folder=/etc/letsencrypt
+
+# Check that it is a site listed in config
+echo $user_names | grep "$userName" > /dev/null
+if [ $? != 0 ]; then
+    echo "FATAL: User not in config file, will not remove site. Exiting!"
+    exit 3
+fi
+
+# Remove users and DBs
+userdel "$user_name"
+groupdel "$user_name"
+echo "Please enter root password for MYSQL: "
+mysql --user=root -p -e "drop database $user_name;
+drop user '$user_name'@'localhost';"
+
+# Remove configs
+rm -f /etc/nginx/sites-enabled/"${FQDN:?}"
+rm -f /etc/nginx/sites-available/"${FQDN:?}"
+rm -f /etc/php5/fpm/pool.d/"${FQDN:?}".conf
+
+
+# Revoke certificate if config for site exists. Will try to revoke all certs.
+if [[ -a $letsencrypt_folder/$FQDN.cli.ini ]]
+then
+	for certificate in $letsencrypt_folder/archive/$FQDN/cert*; do
+		echo "Revoking cert $certificate"
+		../letsencrypt/letsencrypt-auto revoke --cert-path "$letsencrypt_folder"/archive/"$FQDN"/"$certificate"
+		echo ""
+	done
+
+	# Remove config for domain
+	rm -f "${letsencrypt_folder:?}"/"${FQDN:?}".cli.ini
+fi
+
+
+# Remove WP-install
+rm -rf "${base_path:?}"/"${user_name:?}"
+rm -rf /home/"${user_name:?}"/.wp-cli
+
+# Clean wp-mass-admin config
+./write-conf "$user_name"
+
+systemctl reload nginx php5-fpm
